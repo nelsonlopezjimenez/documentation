@@ -17,11 +17,43 @@ operable program or batch file.
 
 Every script that goes through it fails the same way: `develop`, `develop:ssr`, `build`, `clean` and `serve`. (`PARCEL_WORKERS=0` works around [parcel-bundler/parcel#7702](https://github.com/parcel-bundler/parcel/issues/7702).)
 
-The workaround is to set the variable in your shell and call Gatsby directly with `npx`. `npx` uses the copy installed in `node_modules/.bin`, so after `npm install` it works offline.
+The workaround is to set the variable in your shell and call Gatsby directly with `npx`. `npx` uses the copy installed in `node_modules/.bin`, so once dependencies are installed it works offline.
+
+## Installing dependencies
+
+Use `npm ci`, not `npm install`:
+
+```powershell
+npm ci
+```
+
+`npm ci` installs exactly what `package-lock.json` lists and never rewrites it. If the lockfile and `package.json` don't match, it fails instead of quietly changing the lockfile. `npm install` can rewrite the lockfile in several cases:
+
+- **You're on an older commit.** npm may re-resolve parts of the dependency tree that a newer commit already updated. Run `git pull` first.
+- **A different npm version.** Each npm version writes the lockfile slightly differently. Use the same npm major version on every machine.
+- **A local or mirror registry** (for example [Verdaccio](https://verdaccio.org) at `http://localhost:4873`). Entries npm resolves fresh get `"resolved"` URLs that point at that registry.
+
+**Never commit a lockfile that contains `localhost` or other private registry URLs.** Those URLs only work on that machine and break installs everywhere else. To check:
+
+```powershell
+git diff --ignore-cr-at-eol package-lock.json | Select-String "localhost|resolved"
+```
+
+To discard an accidental lockfile change and reinstall cleanly:
+
+```powershell
+git checkout package-lock.json
+git pull
+npm ci
+```
+
+`npm ci` still works with a local registry. By default npm downloads the lockfile's `registry.npmjs.org` URLs through the configured registry without rewriting the file (the `replace-registry-host` setting). This works as long as the registry has those versions cached or can proxy to npmjs.
+
+If `git diff` shows the whole lockfile changed but `git diff --ignore-cr-at-eol` shows nothing, only the line endings differ (CRLF vs LF). In that case `git checkout package-lock.json` is enough.
 
 ## Commands per shell
 
-Run these from the repository root, after `npm install`.
+Run these from the repository root, after [installing dependencies](#installing-dependencies).
 
 | Task | npm script (fails on Windows) | PowerShell |
 | --- | --- | --- |
@@ -115,7 +147,7 @@ This works, but every page first redirects `/about-npm` to `/about-npm/`, which 
 
 ### Moving it to another machine
 
-Copy `public/`. With Option 2, also copy `scripts/serve-offline.js` and pass the folder as the second argument. Only Node is required, no `npm install`.
+Copy `public/`. With Option 2, also copy `scripts/serve-offline.js` and pass the folder as the second argument. Only Node is required, no `npm ci` or `npm install`.
 
 ## What still needs the internet
 
